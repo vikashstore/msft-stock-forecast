@@ -520,8 +520,7 @@ app.get('/health', (req, res) => {
     service: 'Top 10 S&P 500 Stock Forecast Email Service',
     recipient: EMAIL_RECIPIENT,
     schedule: `${EMAIL_SEND_HOUR}:${EMAIL_SEND_MINUTE} AM EST (Monday-Friday)`,
-    stocks: TOP_STOCKS.map(s => s.ticker),
-    nextExecution: job.nextDates().toString()
+    stocks: TOP_STOCKS.map(s => s.ticker)
   });
 });
 
