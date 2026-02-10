@@ -69,10 +69,11 @@ async function fetchStockData(ticker) {
   }
 }
 
-// Function to generate AI forecast for a stock
-async function generateStockForecast(ticker, name, stockData) {
-  try {
-    const prompt = `Analyze ${ticker} (${name}) and provide forecast in EXACT JSON format:
+// Function to generate AI forecast for a stock with retry logic
+async function generateStockForecast(ticker, name, stockData, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const prompt = `Analyze ${ticker} (${name}) and provide forecast in EXACT JSON format:
 
 {
   "recommendation": "BUY" or "SELL" or "HOLD",
@@ -87,34 +88,52 @@ Current: $${stockData.currentPrice}, Change: ${stockData.change}%, 52W High: $${
 
 Make keyInsight specific and data-driven (max 20 words). Respond ONLY with JSON.`;
 
-    const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GOOGLE_API_KEY}`,
-      {
-        contents: [{
-          parts: [{ text: prompt }]
-        }]
-      },
-      {
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
+      const response = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GOOGLE_API_KEY}`,
+        {
+          contents: [{
+            parts: [{ text: prompt }]
+          }]
+        },
+        {
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
 
-    const forecastText = response.data.candidates[0].content.parts[0].text;
-    const cleanedText = forecastText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const forecast = JSON.parse(cleanedText);
-    
-    return forecast;
-  } catch (error) {
-    console.error(`Error forecasting ${ticker}:`, error.message);
-    return {
-      recommendation: "HOLD",
-      priceTarget: { 
-        low: Math.max(0, parseFloat(stockData.currentPrice) - 5).toFixed(2), 
-        high: (parseFloat(stockData.currentPrice) + 5).toFixed(2)
-      },
-      keyInsight: "Analysis temporarily unavailable."
-    };
+      const forecastText = response.data.candidates[0].content.parts[0].text;
+      const cleanedText = forecastText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const forecast = JSON.parse(cleanedText);
+      
+      return forecast;
+    } catch (error) {
+      if (error.response?.status === 429 && attempt < retries) {
+        // Rate limited - wait longer before retry
+        const waitTime = attempt * 5000; // 5s, 10s, 15s
+        console.log(`Rate limited on ${ticker}, retrying in ${waitTime/1000}s... (attempt ${attempt}/${retries})`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      } else {
+        console.error(`Error forecasting ${ticker}:`, error.message);
+        return {
+          recommendation: "HOLD",
+          priceTarget: { 
+            low: Math.max(0, parseFloat(stockData.currentPrice) - 5).toFixed(2), 
+            high: (parseFloat(stockData.currentPrice) + 5).toFixed(2)
+          },
+          keyInsight: "Analysis temporarily unavailable."
+        };
+      }
+    }
   }
+  
+  // If all retries failed
+  return {
+    recommendation: "HOLD",
+    priceTarget: { 
+      low: Math.max(0, parseFloat(stockData.currentPrice) - 5).toFixed(2), 
+      high: (parseFloat(stockData.currentPrice) + 5).toFixed(2)
+    },
+    keyInsight: "Analysis temporarily unavailable due to rate limits."
+  };
 }
 
 // Function to generate forecasts for all stocks
@@ -141,8 +160,9 @@ async function generateAllForecasts() {
       ...forecast
     });
     
-    // Longer delay to avoid rate limiting (3 seconds between stocks)
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // 5 second delay to avoid rate limiting
+    console.log('Waiting 5 seconds before next stock...');
+    await new Promise(resolve => setTimeout(resolve, 5000));
   }
   
   return {
