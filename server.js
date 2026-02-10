@@ -27,7 +27,7 @@ const TOP_STOCKS = [
   { ticker: 'AMZN', name: 'Amazon.com Inc.' },
   { ticker: 'META', name: 'Meta Platforms Inc.' },
   { ticker: 'TSLA', name: 'Tesla Inc.' },
-  { ticker: 'BRK.B', name: 'Berkshire Hathaway Inc.' },
+  { ticker: 'BRK-B', name: 'Berkshire Hathaway Inc.' },
   { ticker: 'LLY', name: 'Eli Lilly and Company' },
   { ticker: 'JPM', name: 'JPMorgan Chase & Co.' }
 ];
@@ -35,12 +35,13 @@ const TOP_STOCKS = [
 // Initialize Google Gemini client
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
-// Email transporter setup
+// Email transporter setup (using SendGrid for Railway compatibility)
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.sendgrid.net',
+  port: 587,
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD,
+    user: 'apikey',
+    pass: process.env.SENDGRID_API_KEY,
   },
 });
 
@@ -140,8 +141,8 @@ async function generateAllForecasts() {
       ...forecast
     });
     
-    // Delay to avoid rate limiting
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Longer delay to avoid rate limiting (3 seconds between stocks)
+    await new Promise(resolve => setTimeout(resolve, 3000));
   }
   
   return {
