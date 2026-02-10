@@ -1,10 +1,9 @@
 // server.js - Top 10 S&P 500 Stock Forecast Email Service
-// Install dependencies: npm install express node-cron nodemailer axios @google/generative-ai dotenv
+// Install dependencies: npm install express node-cron axios @google/generative-ai dotenv
 
 require('dotenv').config();
 const express = require('express');
 const cron = require('node-cron');
-const nodemailer = require('nodemailer');
 const axios = require('axios');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
@@ -35,15 +34,8 @@ const TOP_STOCKS = [
 // Initialize Google Gemini client
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
-// Email transporter setup (using SendGrid for Railway compatibility)
-const transporter = nodemailer.createTransport({
-  host: 'smtp.sendgrid.net',
-  port: 587,
-  auth: {
-    user: 'apikey',
-    pass: process.env.SENDGRID_API_KEY,
-  },
-});
+// Note: Using SendGrid Web API instead of SMTP for Railway compatibility
+// No transporter needed - we'll use axios to call SendGrid API directly
 
 // Function to fetch stock data for a single ticker
 async function fetchStockData(ticker) {
@@ -484,19 +476,33 @@ async function sendForecastEmail(forecastData) {
     </html>
   `;
 
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: EMAIL_RECIPIENT,
-    subject: `📊 Top 10 S&P 500 Daily Forecast - ${forecastData.date}`,
-    html: emailHTML,
-  };
-
+  // Send email using SendGrid Web API (not SMTP)
   try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log('Email sent successfully:', info.messageId);
-    return { success: true, messageId: info.messageId };
+    const response = await axios.post(
+      'https://api.sendgrid.com/v3/mail/send',
+      {
+        personalizations: [{
+          to: [{ email: EMAIL_RECIPIENT }],
+          subject: `📊 Top 10 S&P 500 Daily Forecast - ${forecastData.date}`
+        }],
+        from: { email: process.env.EMAIL_USER, name: 'Stock Forecast Service' },
+        content: [{
+          type: 'text/html',
+          value: emailHTML
+        }]
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.SENDGRID_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    
+    console.log('Email sent successfully via SendGrid API');
+    return { success: true, messageId: response.headers['x-message-id'] };
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('Error sending email:', error.response?.data || error.message);
     return { success: false, error: error.message };
   }
 }
