@@ -11,7 +11,12 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Configuration
-const EMAIL_RECIPIENT = 'aitechdev2@gmail.com';
+// EMAIL_RECIPIENTS can be a comma-separated list in environment variable
+// Example: "email1@example.com,email2@example.com,email3@example.com"
+const EMAIL_RECIPIENTS = process.env.EMAIL_RECIPIENTS 
+  ? process.env.EMAIL_RECIPIENTS.split(',').map(email => email.trim())
+  : ['aitechdev2@gmail.com']; // Default if not set
+
 const MARKET_OPEN_HOUR = 9; // 9:30 AM EST
 const MARKET_OPEN_MINUTE = 30;
 const EMAIL_SEND_HOUR = 8; // 8:30 AM EST (1 hour before market)
@@ -482,7 +487,7 @@ async function sendForecastEmail(forecastData) {
       'https://api.sendgrid.com/v3/mail/send',
       {
         personalizations: [{
-          to: [{ email: EMAIL_RECIPIENT }],
+          to: EMAIL_RECIPIENTS.map(email => ({ email })),
           subject: `📊 Top 10 S&P 500 Daily Forecast - ${forecastData.date}`
         }],
         from: { email: process.env.EMAIL_USER, name: 'Stock Forecast Service' },
@@ -499,7 +504,7 @@ async function sendForecastEmail(forecastData) {
       }
     );
     
-    console.log('Email sent successfully via SendGrid API');
+    console.log(`Email sent successfully to ${EMAIL_RECIPIENTS.length} recipients`);
     return { success: true, messageId: response.headers['x-message-id'] };
   } catch (error) {
     console.error('Error sending email:', error.response?.data || error.message);
@@ -545,7 +550,7 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'running',
     service: 'Top 10 S&P 500 Stock Forecast Email Service',
-    recipient: EMAIL_RECIPIENT,
+    recipients: EMAIL_RECIPIENTS,
     schedule: `${EMAIL_SEND_HOUR}:${EMAIL_SEND_MINUTE} AM EST (Monday-Friday)`,
     stocks: TOP_STOCKS.map(s => s.ticker)
   });
