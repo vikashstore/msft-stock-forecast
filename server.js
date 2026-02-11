@@ -577,7 +577,7 @@ app.get('/test-forecast', async (req, res) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`\n🚀 Server running on port ${PORT}`);
-  console.log(`📧 Sending daily forecasts to: ${EMAIL_RECIPIENT}`);
+  console.log(`📧 Sending daily forecasts to: ${EMAIL_RECIPIENTS.join(', ')}`);
   console.log(`⏰ Scheduled for: ${EMAIL_SEND_HOUR}:${EMAIL_SEND_MINUTE} AM EST (Monday-Friday)`);
   console.log(`📊 Tracking: ${TOP_STOCKS.map(s => s.ticker).join(', ')}`);
   console.log(`\nEndpoints:`);
